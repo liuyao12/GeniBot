@@ -3,24 +3,18 @@ import json
 from pprint import pprint
 from operator import itemgetter
 
-# get access token from Geni API explorer
-access_token = REDACTED
+# get access token from Geni API explorer https://www.geni.com/platform/developer/api_explorer
+access_token = REDACTED # as a string (in quotes)
 print("Access token: " + access_token)
 
 # Validate access token
-print(requests.get("https://www.geni.com/platform/oauth/validate_token?access_token=" + access_token).text)
-
-
-def stripId(url):  # get node id from url (not guid)
-    return(int(url[url.find("profile-") + 8:]))
-
+print(requests.get("https://www.geni.com/platform/oauth/validate_token?access_token=" + access_token).json())
 
 class profile:
     def __init__(self, id, type="g"):  # id int or string
         url = "https://www.geni.com/api/profile-" + type + str(id) + "?access_token=" + access_token
         r = requests.get(url)
         data = r.json()
-        suffix = data.get("names", {}).get("zh-TW", {}).get("suffix")
 
         if type == "g":
             self.guid = id
@@ -29,6 +23,8 @@ class profile:
             self.id = id
             self.guid = int(data["guid"])
 
+        # add Chinese birthorder to the display name
+        suffix = data.get("names", {}).get("zh-TW", {}).get("suffix")
         if suffix != None:
             fullname = data["name"]
             index = fullname.find(" (")
@@ -111,34 +107,6 @@ def updateForest(forest):
         tree.pop("birthorder")
 
 
-def hanziToNumeral(suffix):
-    if suffix == "殤":
-        return None
-    if suffix == "一":
-        return 1
-    if suffix == "二":
-        return 2
-    if suffix == "三":
-        return 3
-    if suffix == "四":
-        return 4
-    if suffix == "五":
-        return 5
-    if suffix == "六":
-        return 6
-    if suffix == "七":
-        return 7
-    if suffix == "八":
-        return 8
-    if suffix == "九":
-        return 9
-    if suffix == "十":
-        return 10
-    else:
-        if suffix[0] == "十":
-            return 10 + hanziToNumeral(suffix[1])
-
-
 def addAncestorToForest(ancestor, forest):  # find if ancestor is in forest, and attach
     found = False
     i = 0
@@ -216,3 +184,34 @@ def search(name, birthyear=0, deathyear=0):  # list of triples (name, birthyear,
     for match in matches:
         match["id"] = stripId(match["id"])
     return matches
+
+
+def stripId(url):  # get node id from url (not guid)
+    return(int(url[url.find("profile-") + 8:]))
+
+def hanziToNumeral(suffix): # from one to nineteen
+    if suffix == "殤":
+        return None
+    if suffix == "一":
+        return 1
+    if suffix == "二":
+        return 2
+    if suffix == "三":
+        return 3
+    if suffix == "四":
+        return 4
+    if suffix == "五":
+        return 5
+    if suffix == "六":
+        return 6
+    if suffix == "七":
+        return 7
+    if suffix == "八":
+        return 8
+    if suffix == "九":
+        return 9
+    if suffix == "十":
+        return 10
+    else:
+        if suffix[0] == "十":
+            return 10 + hanziToNumeral(suffix[1])
