@@ -136,7 +136,7 @@ def hanziToNumeral(suffix):
         return 10
     else:
         if suffix[0] == "十":
-            return 10 + hanziToNumeral(number[1])
+            return 10 + hanziToNumeral(suffix[1])
 
 
 def addAncestorToForest(ancestor, forest):  # find if ancestor is in forest, and attach
@@ -198,13 +198,6 @@ def countNatal(profiles):
                 counts[natal] = 1
     return counts
 
-
-# for person in lineage:
-#     print(person["name"], lifespan(person))
-
-# countProjects(profiles)
-
-# countSurnames(profiles)
 
 def search(name, birthyear=0, deathyear=0):  # list of triples (name, birthyear, deathyear)
     url = "https://www.geni.com/api/profile/search?names=" + name
