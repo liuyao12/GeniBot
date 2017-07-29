@@ -1,10 +1,12 @@
+# Taking a list of names from wikipedia, extract relevant information, and search each name on Geni
+
 import geni_api as geni
 from pprint import pprint
 
-f = open("FRS8.txt", "r")
+f = open("FRS8.txt", "r")     # take a list of names from wikipedia (edit mode)
 
 data = []
-for line in f:
+for line in f:   # extract name and years of birth and death
     if len(line) > 10:
         i = line.find("[[")
         j = line.find("]]")
