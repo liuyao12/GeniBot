@@ -224,30 +224,9 @@ def stripId(url):  # get node id from url (not guid)
 def hanziToNumeral(suffix):
     if isEnglish(suffix):
         return None
-    if suffix == "殤":
-        return None
-    if suffix == "一":
-        return 1
-    if suffix == "二":
-        return 2
-    if suffix == "三":
-        return 3
-    if suffix == "四":
-        return 4
-    if suffix == "五":
-        return 5
-    if suffix == "六":
-        return 6
-    if suffix == "七":
-        return 7
-    if suffix == "八":
-        return 8
-    if suffix == "九":
-        return 9
-    if suffix == "十":
-        return 10
-    if len(suffix) == 2 and suffix[0] == "十":
-        return 10 + hanziToNumeral(suffix[1])
+    index = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十", "二十一", "二十二", "二十三", "二十四", "二十五", "二十六", "二十七", "二十八", "二十九", "三十"].find(suffix)
+    if index != -1:
+        return index + 1
 
 
 def isEnglish(s):
