@@ -7,13 +7,13 @@ Feedback is most welcomed!
 
 Per Geni policy, I must add that it is NOT in any way endorsed, operated, or sponsored by Geni.
 
-##Things that have been done using this
+## Things that have been done using this
 
 * Fixing names that are in ALL CAPS or all small, with special treatment to names like McDonald.
 
 * Moving Chinese names into the zh-TW or zh-CN tabs, so they will show up with surname first (and other "special effects" for Chinese names).
 
 * Importing long lists from wikipedia or scholarly databases
-** Fellows of the Royal Society
-** China Biographical Database (CBDB)
-** 
+** China Biographical Database (CBDB), ongoing
+** Fellows of the Royal Society (full list in spreadsheet)
+** A Finnish project at the request of a fellow curator: http://www.tverinkarjala.fi/muuttoluettelot.html
