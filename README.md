@@ -9,17 +9,17 @@ Per Geni policy, I must add that it is NOT in any way endorsed, operated, or spo
 
 ## Things that have been done using this
 
-* Fixing names that are in ALL CAPS or all small, with special treatment to names like McDonald.
+- Fixing names that are in ALL CAPS or all small, with special treatment to names like McDonald.
 
-* Moving Chinese names into the zh-TW or zh-CN tabs, so they will show up with surname first (and other "special effects" for Chinese names).
+- Moving Chinese names into the zh-TW or zh-CN tabs, so they will show up with surname first (and other "special effects" for Chinese names).
 
-* Importing long lists from wikipedia or scholarly databases
+- Importing long lists from wikipedia or scholarly databases
 
-** China Biographical Database (CBDB), processed some 30,000 profiles https://www.geni.com/projects/CBDB-Hartwell-collection/46406
+-- China Biographical Database (CBDB), processed some 30,000 profiles https://www.geni.com/projects/CBDB-Hartwell-collection/46406
 
-** Fellows of the Royal Society (full list in spreadsheet)
+-- Fellows of the Royal Society (full list in spreadsheet)
 
-** A Finnish project at the request of a fellow curator: http://www.tverinkarjala.fi/muuttoluettelot.html
+-- A Finnish project at the request of a fellow curator: http://www.tverinkarjala.fi/muuttoluettelot.html
 
 # Goal
 
