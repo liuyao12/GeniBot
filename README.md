@@ -14,8 +14,11 @@ Per Geni policy, I must add that it is NOT in any way endorsed, operated, or spo
 * Moving Chinese names into the zh-TW or zh-CN tabs, so they will show up with surname first (and other "special effects" for Chinese names).
 
 * Importing long lists from wikipedia or scholarly databases
+
 ** China Biographical Database (CBDB), processed some 30,000 profiles https://www.geni.com/projects/CBDB-Hartwell-collection/46406
+
 ** Fellows of the Royal Society (full list in spreadsheet)
+
 ** A Finnish project at the request of a fellow curator: http://www.tverinkarjala.fi/muuttoluettelot.html
 
 # Goal
