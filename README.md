@@ -15,11 +15,11 @@ Per Geni policy, I must add that it is NOT in any way endorsed, operated, or spo
 
 - Importing long lists from wikipedia or scholarly databases
 
--- China Biographical Database (CBDB), processed some 30,000 profiles https://www.geni.com/projects/CBDB-Hartwell-collection/46406
++- China Biographical Database (CBDB), processed some 30,000 profiles https://www.geni.com/projects/CBDB-Hartwell-collection/46406
 
--- Fellows of the Royal Society (full list in spreadsheet)
++- Fellows of the Royal Society (full list in spreadsheet)
 
--- A Finnish project at the request of a fellow curator: http://www.tverinkarjala.fi/muuttoluettelot.html
++- A Finnish project at the request of a fellow curator: http://www.tverinkarjala.fi/muuttoluettelot.html
 
 # Goal
 
