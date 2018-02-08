@@ -15,7 +15,7 @@ Per Geni policy, I must add that it is NOT in any way endorsed, operated, or spo
 
 - Importing long lists from wikipedia or scholarly databases
 
-  - China Biographical Database (CBDB), processed some 30,000 profiles https://www.geni.com/projects/CBDB-Hartwell-collection/46406
+  - China Biographical Database (CBDB), processed some 60,000 profiles https://www.geni.com/projects/CBDB-Hartwell-collection/46406
 
   - Fellows of the Royal Society (full list in spreadsheet)
 
