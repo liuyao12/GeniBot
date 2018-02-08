@@ -1,24 +1,22 @@
 import requests
-import json
-from pprint import pprint
 
-fuxing = ["歐陽", "諸葛", "長孫", "慕容", "司馬", "司徒", "皇甫", "閭丘", "宇文", "上官", "范姜", "陸費"]
-order = {str(i): ['', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'][i] for i in range(1, 11)}
+fuxing = ['歐陽', '諸葛', '長孫', '万俟', '公孫', '夏侯', '慕容', '司馬', '司徒', '皇甫', '閭邱', '閭丘', '宇文', '上官', '范姜', '陸費', '耶律', '完顏', '侍其', '聞人', '獨孤', '尉遲']
 
 
 class profile:
     def __init__(self, id):
-        self.id = id
+        self.id = int(id)
         url = "https://cbdb.fas.harvard.edu/cbdbapi/person.php?id={}&o=json".format(str(id))
         r = requests.get(url)
         if r.json().get('Package', {}).get('PersonAuthority', {}).get('PersonInfo', '') == '':
             self.id = None
             return None
         data = r.json().get('Package', {}).get('PersonAuthority', {}).get('PersonInfo', {}).get('Person', {})
-        self.data = data
+        self.rawdata = data
 
         bio = data.get('BasicInfo', {})
-        gender = bio.get('gender', '0')
+        self.dynasty = data.get('BasicInfo', {}).get('Dynasty', '')
+        gender = bio.get('Gender', '0')
         if gender == '0':
             self.gender = "male"
         elif gender == '1':
@@ -27,7 +25,7 @@ class profile:
             self.gender = "unknown"
         name = bio.get('ChName', '-')
         self.chName = name
-        self.engName = bio.get('EngName', '')
+        self.engName = bio.get('EngName', '').replace('v', 'ü')
         if "(" in self.engName:
             self.engName = " ".join([word.split("(")[0] for word in self.engName.split(" ")])
         if name[:2] in fuxing:
@@ -44,20 +42,11 @@ class profile:
             self.death = "?"
         self.birth = bio.get('YearBirth', '?')
         if self.birth == '0' or not self.birth.isdigit():
-            if self.death.isdigit() and bio.get("YearsLived", "").isdigit() and bio.get("YearsLived", "") != "0":
-                self.birth = int(self.death) - int(bio.get('YearsLived', '')) + 1
+            age = bio.get('YearsLived', '')
+            if self.death.isdigit() and age.isdigit() and age != "0":
+                self.birth = str(int(self.death) - int(age) + 1)
             else:
                 self.birth = "?"
-
-        notes = bio.get("Notes", "")
-        self.notes = notes  # modify to Geni style
-        if len(notes) > 20:
-            first2words = " ".join(notes.split(" ")[:2])
-            name_in_notes = " ".join([word.split("(")[0] for word in first2words.split(" ")])
-            if self.engName == name_in_notes:
-                self.notes = "[https://cbdb.fas.harvard.edu/cbdbapi/person.php?id={} '''{}''' {}]".format(str(self.id), self.engName, self.chName) + notes[len(first2words):] + " — [https://www.geni.com/projects/CBDB-Hartwell-collection/46406 RMH]"
-            else:
-                self.notes = "[https://cbdb.fas.harvard.edu/cbdbapi/person.php?id={} '''{}''' {}]\n".format(str(self.id), self.engName, self.chName) + notes + " — [https://www.geni.com/projects/CBDB-Hartwell-collection/46406 RMH]"
 
         zihao = ""
         if data.get('PersonAliases', {}) != "":
@@ -65,10 +54,11 @@ class profile:
             if type(aliases) == dict:
                 aliases = [aliases]
             for alias in aliases:
-                if alias.get('AliasType') in ["字", "號"] and alias.get('AliasName') not in zihao:
-                    zihao = zihao + alias.get('AliasName', '') + " "
-            if len(zihao) > 1 and zihao[len(zihao) - 1] == " ":
-                zihao = zihao[:len(zihao) - 1]
+                zi = alias.get('AliasName', '')
+                if alias.get('AliasType') in ['字', '號', '室名、別號', '未詳'] and zi not in zihao:
+                    zihao = zihao + zi + ' '
+            if len(zihao) > 1 and zihao[-1] == " ":
+                zihao = zihao[:-1]
         self.zihao = zihao
 
         if self.fn == '':
@@ -81,15 +71,32 @@ class profile:
         self.natal = ''
         self.natalFullname = self.fullname
         if type(data.get('PersonAddresses', '')) != str:
-            address = data.get('PersonAddresses', {}).get('Address', {})
-            if type(address) == list:
-                address = address[0]
-            zhou = address.get('belongs1_name', '')
-            if '路' in zhou:
-                zhou = ''
-            if len(zhou) > 2 and zhou[2] in ["府", "軍"]:
-                zhou = zhou[:2]
-            xian = address.get('AddrName', '')
+            addresses = data.get('PersonAddresses', {}).get('Address', [])
+            if type(addresses) == dict:
+                addresses = [addresses]
+            jiguan = {}
+            for address in addresses:
+                if address['AddrType'] == '籍貫(基本地址)':
+                    jiguan = address
+                    break
+            if jiguan == {} and len(addresses) > 0:
+                jiguan = addresses[0]
+
+            xian = jiguan.get('AddrName', '')
+            if xian == '甄城':
+                xian = '鄄城'
+
+            if self.dynasty in ['明', '清', '民國']:
+                zhou = jiguan.get('belongs2_name', '')
+                if '省' in zhou:
+                    zhou = zhou[:2]
+            else:
+                zhou = jiguan.get('belongs1_name', '')
+                if '路' in zhou or '道' in zhou or '省' in zhou:
+                    zhou = ''
+                if len(zhou) > 2 and zhou[2] in ["府", "軍"]:
+                    zhou = zhou[:2]
+
             if zhou == xian:
                 self.natal = xian
             else:
@@ -98,6 +105,14 @@ class profile:
                 self.natal = ''
             if self.natal != "":
                 self.natalFullname = '【{}】'.format(self.natal) + " " + self.fullname
+
+        notes = bio.get("Notes", "")
+        self.notes = "[https://cbdb.fas.harvard.edu/cbdbapi/person.php?id={} '''{}''' {}] ".format(str(self.id), self.engName, self.chName) + notes
+        if len(notes.split(' ')) > 2:
+            first2words = " ".join(notes.split(" ")[:2])
+            name_in_notes = " ".join([word.split("(")[0] for word in first2words.split(" ")])
+            if self.engName == name_in_notes:
+                self.notes = "[https://cbdb.fas.harvard.edu/cbdbapi/person.php?id={} '''{}''' {}]".format(str(self.id), self.engName, self.chName) + notes[len(first2words):]
 
         if data.get('PersonKinshipInfo', '') == '':
             self.kins = []
@@ -109,10 +124,10 @@ class profile:
             for kin in kins:
                 self.kins.append({'kin': kin.get('KinRel'), 'id': kin.get('KinPersonId'), 'name': kin.get('KinPersonName')})
 
+        # data to add to Geni
         self.data = {"gender": self.gender,
                      "living": False,
                      "public": True,
-                     "first_name": ' ',
                      "names": {
                          "en-US": {
                              "display_name": self.engName + " " + self.chName},
