@@ -27,13 +27,13 @@ In short: A bridge between [Geni.com](https://www.geni.com) and other "interest 
 
 ## What is Geni?
 
-Geni's own mission, since it was launched in 2007, was to create a single family tree for the entire world, with a single profile for each and every person ever lived. What the public does not know is that Geni is, or has the potential to be, much more than just genealogy, but to be a platform which I would like to call a wikipedia for biographical data, with the core infrastructure on family relations (parent-child, including adoptions) while connections based on other human activities are accommodated by **timeline events** and **public projects**. It would resemble in one or another aspect the following three enterprises:
+Geni's own mission, since its launch in 2007, was to create a single family tree for the entire world, with a single profile for each and every person ever lived. What the public does not know is that Geni is, or has the potential to be, much more than just genealogy, but to be a platform which I would like to call a wikipedia for biographical data, with the core infrastructure on family relations (parent-child, including adoptions) while connections based on other human activities are accommodated by **timeline events** and **public projects**. It would resemble in one or another aspect the following three enterprises:
 
 - wikipedia: only noteworthy people, and the structure is not specially designed for biographical data. They do have templates to that effect, but it poses quite a learning curve. Their advantage, of course, is that it blends into other non-biographical entries, their reputation as the first go-to place, and large number of active users who constantly correct mistakes and improve the contents.
 
-- facebook: only living people (You can't make money off of dead people). Geni had actually started off trying to imitate the social media model, but could not scale by breaking out of the (relatively) small circle of genealogy enthusiasts.
+- facebook: only living people (To be blunt, you can't make money off of dead people). Geni had actually started off trying to emulate the social media model, but could not really break out of the (relatively) small circle of genealogy enthusiasts.
 
-- (scholarly) biographical databases: Most have poor user interface, and lack the technologies to "match" and "merge" the individual trees into a big network.
+- (scholarly) biographical databases: most have poor user interface, and lack the technologies to "match" and "merge" the individual "relations" into a big network.
 
 
 ### Big Data: Geni's World Family Tree (The Big Tree)
