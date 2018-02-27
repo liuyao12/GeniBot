@@ -5,22 +5,25 @@ from operator import itemgetter
 
 # get access token from Geni API explorer https://www.geni.com/platform/developer/api_explorer
 # or https://www.geni.com/platform/oauth/authorize?client_id=382&redirect_uri=www.geni.com&response_type=token
-access_token = "REDACTED"
+access_token = "REDACTED"    # Geni CBDB
+access_token = "REDACTED"    # mine
 print("Access token: " + access_token)
 
+AC = {'access_token': access_token}
 
-def validate(access_token):
+
+def validate(token):
     # Validate access token
-    r = requests.get("https://www.geni.com/platform/oauth/validate_token?access_token={}".format(access_token))
+    AC = {'access_token': token}
+    r = requests.get("https://www.geni.com/platform/oauth/validate_token", json=AC)
     print(r.json())
     return r.json().get('result', '') == 'OK'
 
 
 validate(access_token)
 
-# AC = {}
 
-fuxing = ["歐陽", "諸葛", "長孫", "慕容", "司馬", "司徒", "皇甫", "閭丘", "宇文", "上官", "范姜", "陸費"]
+fuxing = ['歐陽', '諸葛', '長孫', '万俟', '公孫', '夏侯', '慕容', '司馬', '司徒', '皇甫', '閭邱', '閭丘', '宇文', '上官', '范姜', '陸費', '耶律', '完顏', '侍其', '聞人', '獨孤', '尉遲']
 
 
 def isEnglish(s):
@@ -42,11 +45,21 @@ def stripId(url):  # get node id from url (not guid)
 
 
 class profile:
-    def __init__(self, id, type="g"):  # type = "g" or ""
-        url = "https://www.geni.com/api/profile-{}{}".format(type, str(id))
-        r = requests.get(url, data=AC)
+    def __init__(self, id, id_type='g'):  # id_type = 'g' or ''
+        url = 'https://www.geni.com/api/profile-{}{}'.format(id_type, str(id))
+        r = requests.get(url, json=AC)
         data = r.json()
+        while 'merged_into' in data:
+            id = data['merged_into'].split('-')[1]
+            url = "https://www.geni.com/api/profile-{}".format(str(id))
+            r = requests.get(url, json=AC)
+            data = r.json()
         self.id = stripId(data["id"])
+        self.guid = data['guid']
+
+        # url = 'https://www.geni.com/api/profile-{}?fields=about_me'.format(str(self.id))
+        # r = requests.get(url, json=AC)
+        # self.about_me = r.json().get('about_me', '')
 
         self.fulldata = data  # raw data
         data.pop("mugshot_urls", None)
@@ -57,18 +70,18 @@ class profile:
     def nameLifespan(self):
         birth = self.data.get("birth", {}).get("date", {}).get("year", "?")
         death = self.data.get("death", {}).get("date", {}).get("year", "?")
-        if self.data.get("is_alive", ""):
-            death = ""
+        if self.data.get("is_alive", False):
+            death = " "
         if birth == "?" and death == "?":
             return self.data.get("name", "")
         else:
             return self.data.get("name", "") + " ({}—{})".format(str(birth), str(death))
 
-    def parent(self, gender="male", type="birth"):
+    def parent(self, gender="male", birth_type="birth"):
         unions = self.data.get("unions")
         for union in unions:
             r = requests.get(union, json=AC).json()
-            if (type in ["birth", "biological"] and self.data["url"] in r.get("children", []) and self.data["url"] not in r.get("adopted_children", [])) or (type == "adopted" and self.data["url"] in r.get("adopted_children", [])):
+            if (birth_type in ["birth", "biological"] and self.data["url"] in r.get("children", []) and self.data["url"] not in r.get("adopted_children", [])) or (birth_type == "adopted" and self.data["url"] in r.get("adopted_children", [])):
                 for url in r.get("partners", {}):
                     id = stripId(url)
                     parent = profile(id, "")
@@ -76,30 +89,30 @@ class profile:
                         return parent
         return None
 
-    def father(self, type="birth"):
-        return self.parent("male", type=type)
+    def father(self, birth_type="birth"):
+        return self.parent("male", birth_type=birth_type)
 
-    def mother(self, type="birth"):
-        return self.parent("female", type=type)
+    def mother(self, birth_type="birth"):
+        return self.parent("female", birth_type=birth_type)
 
-    def ancestor(self, generation, gender="male", type="birth"):
+    def ancestor(self, generation, gender="male", birth_type="birth"):
         p = self
         for i in range(generation):
-            p = p.parent(gender=gender, type=type)
-            if p == None:
+            p = p.parent(gender=gender, birth_type=birth_type)
+            if p is None:
                 return None
         return p
 
-    def ancestry(self, forest=None, gender="male", type="birth"):
+    def ancestry(self, forest=None, gender="male", birth_type="birth"):
         p = self
-        if forest == None:
+        if forest is None:
             forest = []
         lineage = {"id": p.id, "name": p.nameLifespan(), "offs": []}
         print("Getting the ancestry of:", p.nameLifespan())
         i = 1
-        while addAncestorToForest(lineage, forest) == False:
-            p = p.parent(gender=gender, type=type)
-            if p == None:
+        while addAncestorToForest(lineage, forest) is False:
+            p = p.parent(gender=gender, birth_type=birth_type)
+            if p is None:
                 forest.append(lineage)
                 return forest
             else:
@@ -108,18 +121,25 @@ class profile:
             i = i + 1
         return p.data.get("id", "no name")
 
+    def update_about(self, text, gender=0):
+        data = {'about_me': str(text)}
+        if gender == 1:
+            data['gender'] = 'female'
+        url = 'https://www.geni.com/api/profile-{}/update-basics?access_token={}'.format(self.id, access_token)
+        r = requests.post(url, json=data)
+
     def fix(p, indent=0):  # customized fix
         language = "zh-TW"
 
-        if "names" in p.data:
-            return
+        # if "names" in p.data:
+        #     return
 
-        names = p.names
-        names.pop("suffix")
-        names.pop("title")
+        # names = p.names
+        # names.pop("suffix")
+        # names.pop("title")
 
         if isEnglish(p.data.get("name", "")):
-            # names = p.data.get("names", {}).get(language, {})
+            names = p.data.get("names", {}).get(language, {})
             for key in names:
                 name = names[key]
                 if name[:2] == "Mc" or name[:3] == "Mac":
@@ -128,68 +148,76 @@ class profile:
                     names[key] = normalCase(name)
             data = names
         else:
+            names = p.data  # ['names']['zh-TW']
+            name = names.get("name", '')
             fn = names.get("first_name", "")
             ln = names.get("last_name", "")
-            mn = names.get("maiden_name", "")
-            dn = names.get("display_name", "")
-            aka = names.get("nicknames", "")
-            middle = names.get("middle_name", "")
-            names["display_name"] = ""
-            names["maiden_name"] = ""
-            if aka != "":
-                names["middle_name"] = middle + " " + " ".join(aka.split(","))
+            # mn = names.get("maiden_name", "")
+            # dn = names.get("display_name", "")
+            # aka = names.get("nicknames", "")
+            # middle = names.get("middle_name", "")
+            natal = ''
+            if ln == '葉赫顏札':
+                # names["display_name"] = ""
+                natal = ln
+                ln = fn[0]
+                fn = fn[1:]
+            # if aka != "":
+            #     ？e + " " + " ".join(aka.split(","))
 
-            ln_e = ""
-            if " " in ln:
-                if isEnglish(ln.split(" ")[0]) == False and isEnglish(ln.split(" ")[1]):
-                    ln_e = ln.split(" ")[1]
-                    ln = ln.split(" ")[0]
-                    names["last_name"] = ln
+            # ln_e = ""
+            # if " " in ln:
+            #     if isEnglish(ln.split(" ")[0]) is False and isEnglish(ln.split(" ")[1]):
+            #         ln_e = ln.split(" ")[1]
+            #         ln = ln.split(" ")[0]
+            #         names["last_name"] = ln
 
             if fn in [" ", "?", "？", "NN", "N.N.", "氏"]:
                 names["first_name"] = ""
-            else:
-                if len(ln) > 1 and ln not in fuxing and len(fn) > 1 and mn == "":  # Manchu
-                    names["maiden_name"] = names["last_name"].split(" ")[0]
-                    names["last_name"] = names["first_name"][0]
-                    names["first_name"] = names["first_name"][1:]
+            # else:
+            #     if len(ln) > 1 and ln not in fuxing and len(fn) > 1 and mn == "":  # Manchu
+            #         names["maiden_name"] = names["last_name"].split(" ")[0]
+            #         names["last_name"] = names["first_name"][0]
+            #         names["first_name"] = names["first_name"][1:]
 
-            prefix = dn.split(" ")[0]
-            if fn not in prefix and ln not in prefix:
-                names["title"] = prefix
+            # prefix = dn.split(" ")[0]
+            # if fn not in prefix and ln not in prefix:
+            #     names["title"] = prefix
 
-            if "(" in dn and ")" in dn:
-                names["suffix"] = dn.split("(")[1].split(")")[0]
+            # if "(" in dn and ")" in dn:
+            #     names["suffix"] = dn.split("(")[1].split(")")[0]
 
             data = {
-                "first_name": "",
-                "middle_name": "",
-                "last_name": ln_e,
-                "maiden_name": "",
+                "first_name": '',
+                # "middle_name": '',
+                "last_name": '',
+                # "maiden_name": '',
                 "names": {
-                    language: names
+                    language: {
+                        'first_name': fn,
+                        'last_name': ln,
+                        'maiden_name': natal
+                    }
                 }}
 
-        url = "https://www.geni.com/api/profile-" + str(p.id) + "/update?access_token=" + access_token
-        r = requests.post(url, json=data)
-        print("  " * indent + "fixing", r.json().get("name", ""), r.json().get("id", "No id"))
+            url = "https://www.geni.com/api/profile-" + str(p.id) + "/update?access_token=" + access_token
+            r = requests.post(url, json=data)
+            names = r.json()
+            print("  " * indent + "fixing", names.get("name", ""), names.get("id", "No id"))
 
 
-def im_family(id, type="g"):
-    url = "https://www.geni.com/api/profile-" + type + str(id) + "/immediate-family?fields=name&id"
+def im_family(id, id_type='g'):
+    if id_type == 'g':
+        id = profile(id, id_type).id
+    url = 'https://www.geni.com/api/profile-{}/immediate-family?fields=name,guid'.format(str(id))
     r = requests.get(url, json=AC)
-
     data = r.json().get("nodes", {})
-    if type == "g":
-        focus_id = stripId(data.get("id", ""))
-    else:
-        focus_id = id
-    results = {key: data[key] for key in data if "profile-" in key and stripId(key) != focus_id}
+    results = {key: data[key] for key in data if 'profile-' in key and stripId(key) != id}
     return results
 
 
 def normalCase(name):
-    if isEnglish(name) == False:
+    if not isEnglish(name):
         return name
     if len(name) < 2:
         name = name.upper()
@@ -228,41 +256,34 @@ print(normalCase(s))
 
 
 class Chinese(profile):
-    def __init__(self, id, type="g"):
-        super().__init__(self, id, type)
+    def __init__(self, id, id_type='g'):
+        super().__init__(id, id_type)
 
-        if "zh-TW" not in self.data.get("names", {}) and "zh-CN" not in self.data.get("names", {}):
-            return self.fullname
+        if "zh-TW" not in self.data.get('names', {}) and "zh-CN" not in self.data.get('names', {}):
+            self.fullname = self.data.get('name', '')
+        else:
+            lang = "zh-TW"
+            if "zh-TW" not in self.data.get("names", {}) and "zh-CN" in self.data.get("names", {}):
+                lang = "zh-CN"
 
-        lang = "zh-TW"
-        if "zh-TW" not in self.data.get("names", {}) and "zh-CN" in self.data.get("names", {}):
-            lang = "zh-CN"
+            names = self.data.get("names", {}).get(lang, {})
+            fn = names.get("first_name", "")
+            ln = names.get("last_name", "")
+            aka = names.get("middle_name", "")
+            mn = names.get("maiden_name", "")
+            suffix = names.get("suffix", "")
+            title = names.get("title", "")
 
-        self.names = self.data.get("names", {}).get(lang, {})
-        self.fullname = fullChineseName()
-
-    def fullChineseName(self, surname=None, natal=None):  # construct display name
-
-        fn = self.names.get("first_name", "")
-        ln = self.data.get("names", {}).get(lang, {}).get("last_name", "")
-        if ln == surname:  # hide surname
-            ln = ""
-        aka = self.data.get("names", {}).get(lang, {}).get("middle_name", "")
-        if aka != "":
-            aka = " (" + aka + ")"
-        mn = self.data.get("names", {}).get(lang, {}).get("maiden_name", "")
-        if mn != "" and mn != natal:
-            mn = "【" + mn + "】"
-        suffix = self.data.get("names", {}).get("zh-TW", {}).get("suffix", "")
-        if suffix != "":
-            suffix = " (" + suffix + ")"
-        title = self.data.get("names", {}).get("zh-TW", {}).get("title", "")
-        if title != "" and mn == "":
-            mn == " "
-        fullname = title + mn + ln + fn + suffix + aka
-        if fullname != " ":
-            self.data["name"] = fullname
-        return fullname
+            if aka != "":
+                aka = " (" + aka + ")"
+            if mn != "" and mn != ln:
+                mn = "【" + mn + "】"
+            if suffix != "":
+                suffix = " (" + suffix + ")"
+            if title == '':
+                self.fullname = ln + fn + suffix + aka
+            else:
+                self.fullname = title + ' ' + ln + fn + suffix + aka
 
 
 fixed = []
@@ -298,9 +319,9 @@ def recursion(focus, max=5, level=0, tolerance=0, log=[]):
             #         "https://www.geni.com/api/user-4730491",
             #         "https://www.geni.com/api/user-1482071"]:
             name = family[key].get("name", "")
-            if isEnglish(name) == True and normalCase(name) != name:  # and 'le ' in name:
+            if isEnglish(name) is False:  # and normalCase(name) != name:
                 p = profile(key, "")
-                if "curator" not in p.data and any([word == word.lower() or word == word.upper() for word in [p.names["first_name"], p.names["middle_name"], p.names["last_name"], p.names["maiden_name"]] if len(word) > 2]):  # criterion
+                if "curator" not in p.data and 'names' not in p.data:  # and any([word == word.lower() or word == word.upper() for word in [p.names["first_name"], p.names["middle_name"], p.names["last_name"], p.names["maiden_name"]] if len(word) > 2]):  # criterion
                     p.fix(indent=level + 1)
                     second_pass.append(p)
             else:
@@ -316,8 +337,8 @@ def recursion(focus, max=5, level=0, tolerance=0, log=[]):
     return log
 
 
-def fixAll(id, type="g", max=5):
-    p = profile(id, type)
+def fixAll(id, id_type="g", max=5):
+    p = profile(id, id_type)
     p.fix()
     log = recursion(p, max)
     print("Done! Total # of Profiles =", len(fixed))
@@ -327,28 +348,46 @@ def fixAll(id, type="g", max=5):
 def add_profile(data, guid=None, rel=None):
     if guid is None or rel is None:  # create a branch
         url = 'https://www.geni.com/api/profile/add?access_token=' + access_token
-    else:  # add profile as guid's rel
+    elif rel in ['parent', 'child', 'sibling']:  # add profile as guid's rel (parent/sibling/child)
         url = 'https://www.geni.com/api/profile-g{}/add-{}?access_token='.format(str(guid), rel) + access_token
-    r = requests.post(url, data)
-    print(r.json())
-    id = r.json().get('guid', 'error')
-    if data.get('is_alive', True) is False:
-        requests.post('https://www.geni.com/api/profile-g{}/update-basics?is_alive=False&access_token={}'.format(id, access_token))
-    return id
+    r = requests.post(url, json=data)
+    guid = r.json().get('guid', 'error')
+    return guid
 
 
-def add_to_project(id, project_id):
-    url = 'https://www.geni.com/api/project-{}/add_profiles?profile_ids=g{}&access_token={}'.format(str(project_id), str(id), access_token)
+def update(guid, data):
+    url = 'https://www.geni.com/api/profile-g{}/update?access_token='.format(str(guid)) + access_token
+    r = requests.post(url, json=data)
+
+
+def add_to_project(guid, project_id):
+    url = 'https://www.geni.com/api/project-{}/add_profiles?profile_ids=g{}&access_token={}'.format(str(project_id), str(guid), access_token)
     r = requests.post(url)
     return 'results' in r.json()
 
 
-def spanTree(id, max):
-    fixed[:] = []
-    p = profile(id)
-    log = recursion(p, max=max, log=[])
-    print("Done! Total # of Profiles =", len(fixed))
-    return log
+def tree_growth(id, id_type='g', max=5):
+    if type(id) == int:
+        if id_type == 'g':
+            id = profile(id).id
+        data = [[id]]
+    elif type(id) == list:
+        data = id
+        max = len(data) + max
+    while len(data) <= max:
+        data.append([])
+        for id in data[-2]:
+            imf = [stripId(key) for key in im_family(id, id_type='')]
+            flatten = [id for gen in data for id in gen]
+            data[-1].extend([id for id in imf if id not in flatten])
+        print('generation', len(data) - 1, ':', len(data[-1]), sum(len(x) for x in data))
+    return data
+
+    # fixed[:] = []
+    # p = profile(id)
+    # log = recursion(p, max=max, log=[])
+    # print("Done! Total # of Profiles =", len(fixed))
+    # return log
     # from bokeh.plotting import figure, output_file, show
 
     # output_file("lines.html")
@@ -361,14 +400,38 @@ def spanTree(id, max):
     # return [x, y]
 
 
-def migrateNames(id, type="g", moved=[], target="zh-TW"):
+def progeny(id, id_type='g', level=0):
+    focus = Chinese(id, id_type)
+    focus_id = 'https://www.geni.com/api/' + focus.data['id']
+    if focus.data.get('gender') == 'female':
+        return None
+    else:
+        tree = dict(name=focus.fullname)
+        print('   ' * level, focus.fullname)
+        for union in focus.data['unions']:
+            r = requests.get(union, json=AC)
+            if focus_id in r.json().get('partners', []):
+                if 'children' in r.json() and 'children' not in tree:
+                    tree['children'] = []
+                for child in r.json().get('children', []):
+                    add_child = progeny(stripId(child), '', level=level + 1)
+                    if add_child is not None:
+                        tree['children'].append(add_child)
+        if level == 0:
+            print('DONE!')
+            with open('AisinGioro.json', 'r+', encoding='utf-8') as f:
+                json.dump(tree, f)
+        return tree
+
+
+def migrateNames(id, id_type="g", moved=[], target="zh-TW"):
     if len(moved) > 2000:
         return moved
-    p = profile(id, type)
+    p = profile(id, id_type)
     if p.id in moved:
         return moved
     else:
-        if p.moveName(target=target) == False:
+        if p.moveName(target=target) is False:
             return moved
         else:
             moved.append(p.id)
@@ -386,7 +449,7 @@ def mass(surname, start=1, target="zh-CN"):
             break
         results = r.json().get("results", [])
         for person in results:
-            if person.get("names") == None and surname in person.get("last_name") and person.get("creator", "") != "https://www.geni.com/api/user-1633384":
+            if person.get("names") is None and surname in person.get("last_name") and person.get("creator", "") != "https://www.geni.com/api/user-1633384":
                 print(person.get("name", "NA"))
                 ls = migrateNames(stripId(person.get("id", "")), "", moved=[], target=target)
                 print("No of profiles:", len(ls))
@@ -402,22 +465,22 @@ def makeForest(profiles):
 def updateForest(forest, surname=None, natal=None):
     for tree in forest:
         p = profile(tree["id"], "")
-        if p.data.get("names", {}).get("zh-TW") != None:
+        if p.data.get("names", {}).get("zh-TW") is not None:
             p.Chinese(surname=surname, natal=natal)
         tree["name"] = p.nameLifespan()
         updateForest(tree.get("offs"), surname=surname, natal=natal)
         suffix = p.data.get("names", {}).get("zh-TW", {}).get("suffix")
         max = 0
-        if suffix != None:
+        if suffix is not None:
             if suffix.find(".") != -1:
                 suffix = suffix[:suffix.find(".")]
             num = hanziToNumeral(suffix)
-            if num != None:
+            if num is not None:
                 tree["birthorder"] = num
                 if num > max:
                     max = num
     for tree in forest:
-        if tree.get("birthorder") == None:
+        if tree.get("birthorder") is None:
             tree["birthorder"] = max + 1
 
     forest.sort(key=itemgetter("birthorder"))
@@ -448,16 +511,18 @@ def addAncestorToForest(ancestor, forest):  # find if ancestor is in forest, and
     return found
 
 
-def project(id, max=2200):  # just the ids, into a list
-    url = "https://www.geni.com/api/project-" + str(id) + "/profiles?fields=id,name,last_name,maiden_name&access_token=" + access_token
+def project(id, max=10000):  # just the ids, into a list
+    url = 'https://www.geni.com/api/project-{}/profiles?fields=id,name,last_name,maiden_name,birth,death'.format(str(id))
     print("Reading: ", url)
-    r = requests.get(url).json()
+    r = requests.get(url, json=AC).json()
     data = r.get("results")
-    while r.get("next_page") != None and len(data) < max:
+    while r.get("next_page") is not None and len(data) < max:
         print("Reading: ", r["next_page"])
         url = r["next_page"] + "&access_token=" + access_token
         r = requests.get(url).json()
         data = data + r["results"]
+
+    print(len(data))
     return data
 
 
@@ -475,42 +540,33 @@ def countProjects(data):
 
 
 def search(name, birthyear=0, deathyear=0):
-    url = "https://www.geni.com/api/profile/search?names=" + name
+    url = 'https://www.geni.com/api/profile/search?names=' + name
     matches = []
     pagecount = 0
-    while url != None and len(matches) < 500 and pagecount < 20:
-        url = url + "&fields=id,name,birth,death&access_token=" + access_token
+    if type(birthyear) != int:
+        birthyear = 0
+    if type(deathyear) != int:
+        deathyear = 0
+    while url is not None and len(matches) < 10 and pagecount < 5:
+        url = url + '&fields=profile_url,guid,name,birth,death'
         r = requests.get(url)
         results = r.json().get("results", [])
         for res in results:
-            # if birthyear == 0 or res.get("birth", {}).get("date", {}).get("year") == birthyear:
-            #     if deathyear == 0 or res.get("death", {}).get("date", {}).get("year") == deathyear:
-            #         matches.append(res)
+            if birthyear == 0 or res.get("birth", {}).get("date", {}).get("year") == birthyear:
+                if deathyear == 0 or res.get("death", {}).get("date", {}).get("year") == deathyear:
+                    matches.append(res)
             if any(word.upper() in res.get("name", "") for word in name.split(" ")):
                 matches.append(res)
         url = r.json().get("next_page")
         pagecount += 1
-    for res in matches:
-        res["id"] = stripId(res["id"])
     return matches
-
-
-# L = search("Convict Scarborough 1788")
-# print(len(L))
-# newL = []
-# for item in L:
-#     id = item["id"]
-#     p = profile(id, "")
-#     if "project-38645" not in p.data.get("project_ids", []):
-#         newL.append(p.data["guid"])
-# print(newL)
 
 
 def countSurname(profiles):
     counts = {"no name": 0}
     for p in profiles:
         surname = p.data.get("last_name")
-        if surname == None:
+        if surname is None:
             counts["no name"] += 1
         else:
             surnameZh = p.data.get("names", {}).get("zh-TW", {}).get("last_name")
@@ -527,7 +583,7 @@ def countNatal(profiles):
     counts = {"no natal": 0}
     for p in profiles:
         natal = p.data.get("names", {}).get("zh-TW", {}).get("maiden_name")
-        if natal == None:
+        if natal is None:
             counts["no natal"] += 1
         else:
             if natal in counts:
