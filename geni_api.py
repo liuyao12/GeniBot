@@ -1,12 +1,10 @@
 import requests
 import json
-from pprint import pprint
 from operator import itemgetter
 
 # get access token from Geni API explorer https://www.geni.com/platform/developer/api_explorer
 # or https://www.geni.com/platform/oauth/authorize?client_id=382&redirect_uri=www.geni.com&response_type=token
-
-access_token = "REDACTED"    # mine
+access_token = "REDACTED"
 print("Access token: " + access_token)
 
 AT = {'access_token': access_token}
@@ -129,102 +127,61 @@ class profile:
         r = requests.post(url, json=data)
 
     def fix(p, indent=0):  # customized fix
-        language = "zh-CN"
-
-        # if "names" in p.data:
-        #     return
-
-        # names = p.names
-        # names.pop("suffix")
-        # names.pop("title")
 
         if isEnglish(p.data.get("name", "")):
-            # data = dict()
-            # bl = p.data.get('birth', {}).get('location', {})
-            # if 'city' in bl and bl.get('city', '') in bl.get('place_name', ''):
-            #     data['birth'] = {'location': {'place_name': ''}}
-            # dl = p.data.get('death', {}).get('location', {})
-            # if 'city' in dl and dl.get('city', '') in bl.get('place_name', ''):
-            #     data['death'] = {'location': {'place_name': ''}}
-
             names = p.names
             data = dict()
-            for key in names:
-                name = names[key]
-                if len(name) > 0:
-                    if name[:2] == "Mc" or name[:3] == "Mac":
+            for key in ['first_name', 'middle_name', 'last_name', 'maiden_name']:
+                name = names.get(key, '')
+                if len(name) > 3:
+                    if name[:2] == "Mc" or name[:3] == "Mac" or name[:2] == "De":
                         name = name[:3].upper() + name[3:]
-                    if name == name.lower() or name == name.upper():
-                        data[key] = normalCase(name)
-            if len(data) == 0:
-                return False
+                if name == name.lower() or name == name.upper():
+                    new_name = normalCase(name)
+                    if names.get(key, '') != new_name:
+                        data[key] = new_name
+            if len(data) > 0:
+                for key in ['suffix', 'title', 'display_name']:
+                    name = names.get(key, '')
+                    if len(name) > 0:
+                        if name == name.lower() or name == name.upper():
+                            new_name = normalCase(name)
+                            if names[key] != new_name:
+                                data[key] = new_name
         else:
-            names = p.data  # ['names']['zh-TW']
-            name = names.get("name", '')
+            language = "zh-TW"
+            names = p.data.get('names', {}).get(language, {})
             fn = names.get("first_name", "")
             ln = names.get("last_name", "")
             mn = names.get("maiden_name", "")
             dn = names.get("display_name", "")
-            # aka = names.get("nicknames", "")
-            # middle = names.get("middle_name", "")
-            # natal = ''
-            # if ln == '葉赫顏札':
-            #     # names["display_name"] = ""
-            #     natal = ln
-            #     ln = fn[0]
-            #     fn = fn[1:]
-            # if aka != "":
-            #     ？e + " " + " ".join(aka.split(","))
-
-            # ln_e = ""
-            # if " " in ln:
-            #     if isEnglish(ln.split(" ")[0]) is False and isEnglish(ln.split(" ")[1]):
-            #         ln_e = ln.split(" ")[1]
-            #         ln = ln.split(" ")[0]
-            #         names["last_name"] = ln
-
-            if fn in [" ", '?', '？', 'NN', 'N.N.', '氏', 'Wife']:
-                fn = ""
-            if len(fn) == 2 and fn[-1] == '氏':
-                fn = ''
-                ln = ln + fn[1]
-            if ln != mn:
-                ln = ln + mn
-            if ln == '' and len(fn) == 3:
-                ln = fn[0]
-                fn = fn[1:]
-            # else:
-            #     if len(ln) > 1 and ln not in fuxing and len(fn) > 1 and mn == "":  # Manchu
-            #         names["maiden_name"] = names["last_name"].split(" ")[0]
-            #         names["last_name"] = names["first_name"][0]
-            #         names["first_name"] = names["first_name"][1:]
-
-            # prefix = dn.split(" ")[0]
-            # if fn not in prefix and ln not in prefix:
-            #     names["title"] = prefix
-
-            # if "(" in dn and ")" in dn:
-            #     names["suffix"] = dn.split("(")[1].split(")")[0]
-
-            data = {
-                "first_name": '',
-                # "middle_name": '',
-                "last_name": '',
-                "maiden_name": '',
-                'display_name': '',
-                "names": {
-                    language: {
-                        'first_name': fn,
-                        'last_name': ln,
-                        'display_name': dn
-                        # 'maiden_name':
+            aka = names.get("nicknames", "")
+            middle = names.get("middle_name", "")
+            if ln == '裴' and mn in ['絳州聞喜', '河南洛陽', '慶州']:
+                data = {
+                    # "first_name": '',
+                    # # "middle_name": '',
+                    # "last_name": '',
+                    # "maiden_name": '',
+                    # 'display_name': '',
+                    "names": {
+                        language: {
+                            # 'first_name': fn,
+                            # 'last_name': ln,
+                            # 'display_name': dn
+                            'maiden_name': '河東聞喜'
+                        }
                     }
                 }
-            }
-        url = "https://www.geni.com/api/profile-" + str(p.id) + "/update?access_token=" + access_token
-        r = requests.post(url, json=data)
-        print("  " * indent + "fixing", r.json().get("name", ""), r.json().get("id", "No id"))
-        return True
+            else:
+                data = dict()
+        if len(data) == 0:
+            return False
+        else:
+            url = "https://www.geni.com/api/profile-" + str(p.id) + "/update?access_token=" + access_token
+            r = requests.post(url, json=data)
+            print("  " * indent + "fixing", r.json().get("name", ""), r.json().get("id", "No id"))
+            return True
 
 
 def im_family(id, id_type='g'):
@@ -256,7 +213,7 @@ def normalCase(name):
             if n != -1 and n + l < len(name):
                 name = name[:n + l] + name[n + l].upper() + name[n + l + 1:]
 
-        for particle in ["Ab ", "Ap ", "Verch ", "Ferch ", "Ingen ", "Mac ", "Fitz ", "Des ", "Di ", "Du ", "Degli ", "Del ", "Della ", "Dit ", "Den ", "Ten ", "Van ", "Der ", "Ou ", "Von ", "Of ", "Or ", "The ", "Et ", "And ", "D'", "Comte ", "Duc ", "Seigneur ", "Mac ", "Nan ", "Sur-", "Y "]:
+        for particle in ["Ab ", "Ap ", "Verch ", "Ferch ", "Ingen ", "Mac ", "Fitz ", "De ", "Des ", "Di ", "Du ", "Degli ", "Del ", "Della ", "Dit ", "Den ", "Ten ", "Van ", "Der ", "Ou ", "Von ", "Of ", "Or ", "The ", "Et ", "And ", "D'", "Comte ", "Duc ", "Seigneur ", "Mac ", "Nan ", "Sur-", "Y "]:
             if particle in name:
                 name = name.replace(particle, particle.lower())
 
@@ -322,7 +279,10 @@ def recursion(focus, max=5, level=0, tolerance=0, log=[]):
         print("Wrong input for focus")
         return log
 
-    family = {key: family[key] for key in family if key not in fixed}
+    if level == 0:
+        family = {key: family[key] for key in family}
+    else:
+        family = {key: family[key] for key in family if key not in fixed}
 
     if len(family) > 0:
         if type(focus) == profile:
@@ -331,22 +291,15 @@ def recursion(focus, max=5, level=0, tolerance=0, log=[]):
             print("  " * level + "Level", level, "| Focus: " + str(focus))
         second_pass = []  # criteria that need to access profile
         for key in family:
-            # fn = p.data.get("names", {}).get("zh-TW", {}).get("first_name", "")
-            # ln = p.data.get("names", {}).get("zh-TW", {}).get("last_name", "")
-            # suffix = p.data.get("names", {}).get("zh-TW", {}).get("suffix", "")
-            # creator = p.data.get("creator", "")
-            # if creator in [
-            #         "https://www.geni.com/api/user-5239929",
-            #         "https://www.geni.com/api/user-4730491",
-            #         "https://www.geni.com/api/user-1482071"]:
             name = family[key].get("name", "")
             if isEnglish(name) is True:
-                # p = profile(key, "")
-                # bl = p.data.get('birth', {}).get('location', {})
-                # dl = p.data.get('death', {}).get('location', {})
-                # if (bl.get('city', '') != '' and bl.get('city', '') in bl.get('place_name', '')) or (dl.get('city', '') != '' and dl.get('city', '') in bl.get('place_name', '')):
-                if any(word == word.upper() or word == word.lower() or word[:2] == 'Mc' or word[:3] == 'Mac' for word in name.split() if len(word) > 2 and word != 'III'):  # 'names' not in p.data and any([word == word.lower() or word == word.upper() for word in [p.names["first_name"], p.names["middle_name"], p.names["last_name"], p.names["maiden_name"]] if len(word) > 2]):  # criterion "curator" not in p.data and
+                if any(word == word.upper() or word == word.lower() or word[:2] == 'Mc' or word[:3] == 'Mac' for word in name.split() if len(word) > 2 and word != 'III'):
                     p = profile(key, '')
+                    # creator = p.data.get("creator", "")
+                    # if creator in [
+                    #         "https://www.geni.com/api/user-5239929",
+                    #         "https://www.geni.com/api/user-4730491",
+                    #         "https://www.geni.com/api/user-1482071"]:
                     if 'curator' not in p.data and p.fix(indent=level + 1):
                         second_pass.append(p)
                     else:
