@@ -4,7 +4,8 @@ from operator import itemgetter
 
 # get access token from Geni API explorer https://www.geni.com/platform/developer/api_explorer
 # or https://www.geni.com/platform/oauth/authorize?client_id=382&redirect_uri=www.geni.com&response_type=token
-access_token = "REDACTED"
+access_token = "REDACTED"    # Geni CBDB
+access_token = "REDACTED"    # mine
 print("Access token: " + access_token)
 
 AT = {'access_token': access_token}
@@ -35,21 +36,20 @@ def isEnglish(s):
 
 def stripId(url):  # get node id from url (not guid)
     url = url.split(" ")[0]
-    if "profile-" in url:
-        id = int(url.split("-")[1])
+    if url[:8] == "profile-":
+        return int(url.split("-")[1])
     else:
-        id = -1
-    return(id)
+        return -1
 
 
 class profile:
     def __init__(self, id, id_type='g'):  # id_type = 'g' or ''
-        url = 'https://www.geni.com/api/profile-{}{}'.format(id_type, str(id))
+        url = 'https://www.geni.com/api/profile-{}{}'.format(id_type, id)
         r = requests.get(url, json=AT)
         data = r.json()
         while 'merged_into' in data:
             id = data['merged_into'].split('-')[1]
-            url = "https://www.geni.com/api/profile-{}".format(str(id))
+            url = "https://www.geni.com/api/profile-{}".format(id)
             r = requests.get(url, json=AT)
             data = r.json()
         self.id = stripId(data["id"])
@@ -73,10 +73,10 @@ class profile:
         if birth == "?" and death == "?":
             return self.data.get("name", "")
         else:
-            return self.data.get("name", "") + " ({}—{})".format(str(birth), str(death))
+            return self.data.get("name", "NN") + " ({}—{})".format(birth, death)
 
     def parent(self, gender="male", birth_type="birth"):
-        unions = self.data.get("unions")
+        unions = self.data.get("unions", [])
         for union in unions:
             r = requests.get(union, json=AT).json()
             if (birth_type in ["birth", "biological"] and self.data["url"] in r.get("children", []) and self.data["url"] not in r.get("adopted_children", [])) or (birth_type == "adopted" and self.data["url"] in r.get("adopted_children", [])):
@@ -114,7 +114,7 @@ class profile:
                 forest.append(lineage)
                 return forest
             else:
-                print("G" + str(i) + ": " + p.nameLifespan())
+                print("G{}: {}".format(i, p.nameLifespan()))
                 lineage = {"id": p.id, "name": p.nameLifespan(), "offs": [lineage]}
             i = i + 1
         return p.data.get("id", "no name")
@@ -127,7 +127,8 @@ class profile:
         r = requests.post(url, json=data)
 
     def fix(p, indent=0):  # customized fix
-
+        if p.data["claimed"]:
+            return False
         if isEnglish(p.data.get("name", "")):
             names = p.names
             data = dict()
@@ -143,8 +144,10 @@ class profile:
             if len(data) > 0:
                 for key in ['suffix', 'title', 'display_name']:
                     name = names.get(key, '')
-                    if len(name) > 0:
-                        if name == name.lower() or name == name.upper():
+                    if len(name) > 1:
+                        if key == 'suffix' and name[0].isalpha() and name[1].isdigit():
+                            print('DVN skip')
+                        elif name == name.lower() or name == name.upper():
                             new_name = normalCase(name)
                             if names[key] != new_name:
                                 data[key] = new_name
@@ -292,7 +295,7 @@ def recursion(focus, max=5, level=0, tolerance=0, log=[]):
         second_pass = []  # criteria that need to access profile
         for key in family:
             name = family[key].get("name", "")
-            if isEnglish(name) is True:
+            if isEnglish(name):
                 if any(word == word.upper() or word == word.lower() or word[:2] == 'Mc' or word[:3] == 'Mac' for word in name.split() if len(word) > 2 and word != 'III'):
                     p = profile(key, '')
                     # creator = p.data.get("creator", "")
@@ -308,7 +311,7 @@ def recursion(focus, max=5, level=0, tolerance=0, log=[]):
                     second_pass.append(stripId(key))
             fixed.append(key)
         print("  " * (level + 1) + "Total # fixed =", len(fixed))
-        log.append([len(fixed), level])
+        log.append([len(fixed), level, fixed[-1].split('-')[1]])
         for p in second_pass:
             if type(p) == profile:
                 log = recursion(p, max, level + 1, tolerance=0, log=log)
@@ -525,7 +528,7 @@ def updateForest(forest, surname=None, natal=None):
 def hanziToNumeral(suffix):
     if isEnglish(suffix):
         return None
-    hangs = ['', "一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十", "二十一", "二十二", "二十三", "二十四", "二十五", "二十六", "二十七", "二十八", "二十九", "三十"]
+    hangs = ["", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十", "二十一", "二十二", "二十三", "二十四", "二十五", "二十六", "二十七", "二十八", "二十九", "三十"]
     if suffix in hangs:
         return hangs.index(suffix)
     else:
@@ -534,16 +537,15 @@ def hanziToNumeral(suffix):
 
 def addAncestorToForest(ancestor, forest):  # find if ancestor is in forest, and attach
     found = False
-    i = 0
-    while found == False and i < len(forest):
-        tree = forest[i]
+    for tree in forest:
         if tree.get("id") == ancestor.get("id"):
             print("attaching " + ancestor.get("name"))
             tree.get("offs").extend(ancestor.get("offs"))
-            found = True
+            return True
         else:
             found = addAncestorToForest(ancestor, tree.get("offs"))
-        i = i + 1
+            if found:
+                return True
     return found
 
 
