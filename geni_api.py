@@ -1,15 +1,15 @@
 import requests
 import json
 from operator import itemgetter
+from random import randint
 
-# get access token from Geni API explorer https://www.geni.com/platform/developer/api_explorer
+# Get access token from Geni API explorer https://www.geni.com/platform/developer/api_explorer
 # or https://www.geni.com/platform/oauth/authorize?client_id=382&redirect_uri=www.geni.com&response_type=token
 access_token = "REDACTED"    # Geni CBDB
 access_token = "REDACTED"    # mine
-print("Access token: " + access_token)
 
 AT = {'access_token': access_token}
-
+print(AT)
 
 def validate(token):
     # Validate access token
@@ -36,8 +36,8 @@ def isEnglish(s):
 
 def stripId(url):  # get node id from url (not guid)
     url = url.split(" ")[0]
-    if url[:8] == "profile-":
-        return int(url.split("-")[1])
+    if "profile-" in url:
+        return int(url.split("profile-")[-1])
     else:
         return -1
 
@@ -54,15 +54,9 @@ class profile:
             data = r.json()
         self.id = stripId(data["id"])
         self.guid = data['guid']
-
-        # url = 'https://www.geni.com/api/profile-{}?fields=about_me'.format(str(self.id))
-        # r = requests.get(url, json=AT)
-        # self.about_me = r.json().get('about_me', '')
-
-        self.fulldata = data  # raw data
-        data.pop("mugshot_urls", None)
-        data.pop("photo_urls", None)
         self.data = data
+        self.about_me = data.get('about_me', '')
+        self.fulname = data.get('name', '')
         self.names = {key: data.get(key, "") for key in ["first_name", "middle_name", "last_name", "maiden_name", "display_name", "title", "suffix"]}
 
     def nameLifespan(self):
@@ -127,7 +121,7 @@ class profile:
         r = requests.post(url, json=data)
 
     def fix(p, indent=0):  # customized fix
-        if p.data["claimed"]:
+        if p.data.get("claimed", False):
             return False
         if isEnglish(p.data.get("name", "")):
             names = p.names
@@ -153,26 +147,28 @@ class profile:
                                 data[key] = new_name
         else:
             language = "zh-TW"
-            names = p.data.get('names', {}).get(language, {})
+            names = p.names # data.get('names', {}).get(language, {})
             fn = names.get("first_name", "")
             ln = names.get("last_name", "")
             mn = names.get("maiden_name", "")
             dn = names.get("display_name", "")
             aka = names.get("nicknames", "")
             middle = names.get("middle_name", "")
-            if ln == '裴' and mn in ['絳州聞喜', '河南洛陽', '慶州']:
+            if True: # ln == '裴' and mn in ['絳州聞喜', '河南洛陽', '慶州']:
                 data = {
-                    # "first_name": '',
-                    # # "middle_name": '',
-                    # "last_name": '',
-                    # "maiden_name": '',
-                    # 'display_name': '',
+                    "first_name": '',
+                    "middle_name": '',
+                    "last_name": '',
+                    "maiden_name": '',
+                    'display_name': '',
                     "names": {
                         language: {
-                            # 'first_name': fn,
-                            # 'last_name': ln,
-                            # 'display_name': dn
-                            'maiden_name': '河東聞喜'
+                            'first_name': fn,
+                            'middle_name': middle,
+                            'last_name': ln,
+                            'display_name': dn,
+                            'nicknames': aka,
+                            'maiden_name': mn
                         }
                     }
                 }
@@ -320,7 +316,20 @@ def recursion(focus, max=5, level=0, tolerance=0, log=[]):
     return log
 
 
-def fixAll(id, id_type="g", max=5):
+def fixAll(id=None, id_type="g", max=3):
+    if id is None and len(fixed) > 0:
+        p = profile(stripId(fixed[-1]), '')
+        p.fix()
+        log = recursion(p, max)
+        i = len(fixed) - 1
+        level = log[i][1]
+        while i > 0:
+            i -= 1
+            if log[i][1] <= level:
+                p = profile(stripId(log[i][2]), '')
+                p.fix()
+                log = recursion(p, max, log[i][1])
+                level -= 1
     p = profile(id, id_type)
     p.fix()
     log = recursion(p, max)
@@ -392,7 +401,7 @@ def progeny(id, id_type='g', level=0):
             'id': focus.guid,
             'gender': focus.data.get('gender', '')}
     print('   ' * level, focus.fullname)
-    # if focus.data.get('gender') == femaile:
+    # if focus.data.get('gender') == female:
     #     return tree
     for union in focus.data['unions']:
         r = requests.get(union, json=AT)
@@ -451,6 +460,51 @@ def order_progeny(tree={}, path=[], order=None):
             tree['children'].append(tree['children'].pop(order.index(i)))
             order.append(order.pop(order.index(i)))
     return tree
+
+
+def relation_graph(profiles):
+    num = len(profiles)
+    graph = {'nodes': [], 'links': []}
+    for i in range(num):
+        profile1 = profiles[i]['id']
+        name1 = profiles[i]['name']
+        if ', signer' in name1 or ', Signer' in name1 or ', Scribe' in name1:
+            name1 = ', '.join(name1.split(', ')[:-1])
+        node = {'id': name1, 'group': 1}
+        graph['nodes'].append(node)
+        for j in range(i + 1, num):
+            profile2 = profiles[j]['id']
+            name2 = profiles[j]['name']
+            if 'signer' in name2 or 'Signer' in name2 or ', Scribe' in name2:
+                name2 = ', '.join(name2.split(', ')[:-1])
+            url = 'https://www.geni.com/api/{}/path-to/{}?search=0'.format(profile1, profile2)
+            print(i, j, url)
+            r = requests.get(url, json=AT).json()
+            print(r)
+            if r.get('status', '') == 'done' and len(r['relations']) < 10:
+                value = 10 - len(r['relations'])
+                graph['links'].append({'source':name1, 'target':name2, 'value':value, 'path':r['relations'], 'relationship':r['relationship']})
+    # for i, profile1 in enumerate(profile_ids):
+    #     nodes = graph['nodes']
+    #     links = graph['links']
+    #     for j, node in enumerate(nodes):
+    #         if profile1 == node['id']:
+    #             node['group'] = 1
+    #             break
+    #     for k, link in enumerate(links):
+    #         pass
+    #     j = i + 1
+    #     while j <= len(profile_ids):
+    #         profile2 = profile_ids[j]
+    #         url = 'https://www.geni.com/api/{}/path-to/{}?search=0'.format(profile1, profile2)
+    #         r = requests.get(url, json=AT).json()
+    #         j += 1
+    return graph
+
+class node:
+    def __init__(profile_id):
+        pass
+
 
 # with open('Victoria.json', 'r+', encoding='utf-8') as f:
 #     data = json.load(f)
@@ -550,7 +604,7 @@ def addAncestorToForest(ancestor, forest):  # find if ancestor is in forest, and
 
 
 def project(id, max=10000):  # just the ids, into a list
-    url = 'https://www.geni.com/api/project-{}/profiles?fields=id,name,last_name,maiden_name,birth,death'.format(str(id))
+    url = 'https://www.geni.com/api/project-{}/profiles?fields=id,name'.format(str(id))
     print("Reading: ", url)
     r = requests.get(url, json=AT).json()
     data = r.get("results")
